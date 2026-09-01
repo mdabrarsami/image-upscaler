@@ -1,0 +1,75 @@
+{
+  "name": "@smartapp/image-upscaler",
+  "version": "0.1.0",
+  "description": "Framework-agnostic, fully client-side image upscaling SDK. Classical (Lanczos/EDI/detail-reconstruction) plus optional local AI super-resolution. No backend, no API key, images never leave the device.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "browser": "./dist/image-upscaler.min.js",
+  "unpkg": "./dist/image-upscaler.min.js",
+  "jsdelivr": "./dist/image-upscaler.min.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./ai": {
+      "types": "./dist/ai.d.ts",
+      "import": "./dist/ai.js",
+      "require": "./dist/ai.cjs",
+      "default": "./dist/ai.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js",
+      "default": "./dist/worker.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "image",
+    "upscale",
+    "upscaling",
+    "super-resolution",
+    "lanczos",
+    "bicubic",
+    "webgpu",
+    "onnx",
+    "real-esrgan",
+    "client-side",
+    "browser",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsup && node ./scripts/check-dist.mjs",
+    "clean": "rimraf dist"
+  },
+  "peerDependencies": {
+    "onnxruntime-web": ">=1.19.0"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-web": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.49",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
