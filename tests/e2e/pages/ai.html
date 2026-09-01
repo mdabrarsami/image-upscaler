@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AI harness</title>
+  </head>
+  <body>
+    <!--
+      AI harness.
+
+      The prebuilt browser bundles keep `onnxruntime-web` external, because a
+      script-tag consumer has no module resolver and a classical-only consumer
+      should never pay for the runtime. So this page supplies the loader
+      explicitly, exactly as the README tells a bare-ESM consumer to.
+    -->
+    <script type="module">
+      import { ImageUpscaler, detectCapabilities } from '/packages/image-upscaler/dist/image-upscaler.esm.js';
+
+      const ORT_DIR = '/node_modules/onnxruntime-web/dist/';
+
+      const onnxRuntimeLoader = async () => {
+        const ort = await import(`${ORT_DIR}ort.wasm.bundle.min.mjs`);
+        // The bundle fetches its own .wasm at runtime; without this it looks
+        // for it beside the *page*, not beside the module.
+        ort.env.wasm.wasmPaths = ORT_DIR;
+        return ort;
+      };
+
+      function makeUpscaler(extra = {}) {
+        return new ImageUpscaler({
+          // A custom loader is a function, so it cannot cross into a Worker.
+          // The library detects that and stays on this thread; being explicit
+          // here keeps the harness honest about what is being measured.
+          useWorker: false,
+          onnxRuntimeLoader,
+          ...extra,
+        });
+      }
+
+      /** A small, structured test image. */
+      async function makeFile(size = 48) {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, size, size);
+        gradient.addColorStop(0, '#123');
+        gradient.addColorStop(1, '#ed7532');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(size / 4, size / 4, size / 3, size / 8);
+        ctx.beginPath();
+        ctx.arc(size * 0.7, size * 0.7, size * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+        const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+        return new File([blob], 'ai-test.png', { type: 'image/png' });
+      }
+
+      async function makeTransparentFile(size = 48) {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, size, size);
+        ctx.fillStyle = '#00c070';
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+        return new File([blob], 'ai-disc.png', { type: 'image/png' });
+      }
+
+      async function pixels(blob) {
+        const bitmap = await createImageBitmap(blob);
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.globalCompositeOperation = 'copy';
+        ctx.drawImage(bitmap, 0, 0);
+        const data = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+        bitmap.close();
+        return { width: data.width, height: data.height, data: Array.from(data.data) };
+      }
+
+      window.ai = {
+        ImageUpscaler,
+        detectCapabilities,
+        makeUpscaler,
+        makeFile,
+        makeTransparentFile,
+        pixels,
+        ORT_DIR,
+      };
+      window.aiReady = true;
+    </script>
+  </body>
+</html>

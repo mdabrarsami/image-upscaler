@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>script tag harness</title>
+  </head>
+  <body>
+    <!--
+      The literal thing the README promises: one script tag, no bundler, no npm,
+      and a usable `ImageUpscaler` global.
+    -->
+    <script src="/packages/image-upscaler/dist/image-upscaler.min.js"></script>
+    <script>
+      // Everything the harness needs is hung off `window.harness` so the test
+      // can drive it with `page.evaluate` instead of scraping the DOM.
+      window.harness = {
+        /** Draw a test image and hand back a PNG File. */
+        async makeFile(size = 64) {
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const gradient = ctx.createLinearGradient(0, 0, size, size);
+          gradient.addColorStop(0, '#102040');
+          gradient.addColorStop(1, '#ed7532');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, size, size);
+          ctx.strokeStyle = '#fff';
+          for (let i = 0; i < size; i += 5) {
+            ctx.beginPath();
+            ctx.moveTo(i, 0);
+            ctx.lineTo(0, i);
+            ctx.stroke();
+          }
+          const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+          return new File([blob], 'test.png', { type: 'image/png' });
+        },
+
+        /** Transparent red disc on transparent black, as a PNG File. */
+        async makeTransparentFile(size = 64) {
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, size, size);
+          ctx.fillStyle = '#ff0000';
+          ctx.beginPath();
+          ctx.arc(size / 2, size / 2, size * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+          const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+          return new File([blob], 'disc.png', { type: 'image/png' });
+        },
+
+        /** Read the decoded pixels of a blob, for assertions on real output. */
+        async pixels(blob) {
+          const bitmap = await createImageBitmap(blob);
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.globalCompositeOperation = 'copy';
+          ctx.drawImage(bitmap, 0, 0);
+          const data = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+          bitmap.close();
+          return {
+            width: data.width,
+            height: data.height,
+            data: Array.from(data.data),
+          };
+        },
+      };
+    </script>
+  </body>
+</html>

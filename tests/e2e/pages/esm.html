@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ESM harness</title>
+  </head>
+  <body>
+    <!--
+      The other half of the distribution promise: a real ES module import, no
+      bundler involved, straight from the prebuilt ESM file.
+    -->
+    <script type="module">
+      import {
+        ImageUpscaler,
+        detectCapabilities,
+        UpscalerError,
+        isCancellation,
+        resample,
+        getKernel,
+        createSurface,
+        VERSION,
+      } from '/packages/image-upscaler/dist/image-upscaler.esm.js';
+
+      window.esm = {
+        ImageUpscaler,
+        detectCapabilities,
+        UpscalerError,
+        isCancellation,
+        resample,
+        getKernel,
+        createSurface,
+        VERSION,
+      };
+      window.esmReady = true;
+    </script>
+  </body>
+</html>
