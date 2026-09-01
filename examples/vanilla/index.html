@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Image Upscaler - vanilla JS demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Image Upscaler</h1>
+      <p class="lede">
+        Everything on this page runs in your browser. No image is uploaded. Open DevTools and watch
+        the Network tab if you want to check &mdash; the only request this page can make is a model
+        download, and only if you ask for one.
+      </p>
+      <p class="caps" id="capabilities">Detecting capabilities&hellip;</p>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>1. Pick an image</h2>
+        <div id="dropzone" class="dropzone" tabindex="0">
+          <input type="file" id="file" accept="image/png,image/jpeg,image/webp" />
+          <p>Drop an image here, or <label for="file">choose a file</label>.</p>
+          <p class="hint">
+            Or try a <button type="button" id="sample" class="link">generated test image</button>.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>2. Settings</h2>
+        <div class="controls">
+          <label>
+            Scale
+            <select id="scale">
+              <option value="2" selected>2&times;</option>
+              <option value="3">3&times;</option>
+              <option value="4">4&times;</option>
+              <option value="8">8&times;</option>
+            </select>
+          </label>
+
+          <label>
+            Engine
+            <select id="engine">
+              <option value="auto" selected>Auto</option>
+              <option value="classical">Classical</option>
+              <option value="ai">AI</option>
+              <option value="hybrid">Hybrid</option>
+            </select>
+          </label>
+
+          <label>
+            Mode
+            <select id="mode">
+              <option value="balanced" selected>Balanced</option>
+              <option value="natural">Natural</option>
+              <option value="detail">Detail</option>
+              <option value="document">Document / text</option>
+              <option value="pixel-art">Pixel art</option>
+            </select>
+          </label>
+
+          <label>
+            Output
+            <select id="format">
+              <option value="" selected>Same as input</option>
+              <option value="png">PNG</option>
+              <option value="jpeg">JPEG</option>
+              <option value="webp">WebP</option>
+            </select>
+          </label>
+
+          <label class="check">
+            <input type="checkbox" id="worker" checked />
+            Run in a Web Worker
+          </label>
+        </div>
+
+        <details class="advanced">
+          <summary>Fine tuning</summary>
+          <div class="sliders">
+            <label>Sharpening <input type="range" id="sharpening" min="0" max="1" step="0.05" /></label>
+            <label>Detail <input type="range" id="detail" min="0" max="1" step="0.05" /></label>
+            <label>Noise reduction <input type="range" id="noiseReduction" min="0" max="1" step="0.05" /></label>
+            <label>Edge protection <input type="range" id="edgeProtection" min="0" max="1" step="0.05" /></label>
+            <label>Anti-ringing <input type="range" id="antiRinging" min="0" max="1" step="0.05" /></label>
+          </div>
+          <p class="hint">
+            Sliders start unset and inherit the mode preset. Move one to override it.
+          </p>
+        </details>
+      </section>
+
+      <section class="panel">
+        <h2>3. AI models (optional)</h2>
+        <p class="hint">
+          The classical engine needs no download and is always available. An AI model is a one-time
+          download, cached in your browser, and then works offline.
+        </p>
+        <ul id="models" class="models">
+          <li>Loading&hellip;</li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <h2>4. Go</h2>
+        <div class="actions">
+          <button type="button" id="run" disabled>Upscale</button>
+          <button type="button" id="cancelRun" disabled>Cancel</button>
+          <button type="button" id="download" disabled>Download result</button>
+        </div>
+        <div class="progress" hidden id="progressWrap">
+          <div class="bar"><div class="fill" id="progressFill"></div></div>
+          <p class="stage" id="progressText"></p>
+        </div>
+        <p class="error" id="error" hidden></p>
+        <dl class="stats" id="stats" hidden></dl>
+      </section>
+
+      <section class="panel wide">
+        <h2>Comparison</h2>
+        <p class="hint">Drag the divider. The left side is the original, scaled up by the browser
+          for display only; the right side is the real result.</p>
+        <div class="compare" id="compare" hidden>
+          <img id="beforeImg" alt="Original, enlarged by the browser" />
+          <div class="after" id="afterWrap">
+            <img id="afterImg" alt="Upscaled result" />
+          </div>
+          <input type="range" id="split" min="0" max="100" value="50" aria-label="Comparison split" />
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        <code id="version"></code> &mdash; classical engine always available; AI via ONNX Runtime
+        Web, loaded only when requested.
+      </p>
+    </footer>
+
+    <!-- The whole point of this file: a plain script tag, no bundler. -->
+    <script src="../../packages/image-upscaler/dist/image-upscaler.min.js"></script>
+    <script src="./demo.js"></script>
+  </body>
+</html>

@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Upscale an image</title>
+    <style>
+      :root {
+        --bg: #12151c;
+        --panel: #1a1f29;
+        --panel-2: #222834;
+        --line: #2e3644;
+        --ink: #e8ecf3;
+        --dim: #9aa5b8;
+        --accent: #ed7532;
+        --accent-ink: #1b1206;
+        --error: #ff8a80;
+        color-scheme: dark;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f6f7f9; --panel: #fff; --panel-2: #f0f2f6; --line: #dfe3ea;
+          --ink: #1b2029; --dim: #5b6474; --error: #b3261e; color-scheme: light;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--ink);
+        font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main { max-width: 64rem; margin: 0 auto; }
+      h1 { margin: 0 0 .3rem; font-size: 1.6rem; letter-spacing: -.01em; }
+      .lede { margin: 0 0 1.5rem; color: var(--dim); max-width: 44rem; }
+      .panel {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+        padding: 1.1rem 1.2rem; margin-bottom: 1rem;
+      }
+
+      /* --- drop zone --- */
+      #drop {
+        border: 2px dashed var(--line); border-radius: 10px; padding: 2.5rem 1.5rem;
+        text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+      }
+      #drop:hover, #drop:focus-visible { border-color: var(--accent); outline: none; }
+      #drop.over { border-color: var(--accent); background: rgba(237,117,50,.08); }
+      #drop.has-file { padding: 1rem; text-align: left; display: flex;
+                       align-items: center; gap: 1rem; }
+      #drop p { margin: .3rem 0; }
+      #drop .big { font-size: 1.05rem; }
+      #drop .hint { font-size: .84rem; color: var(--dim); }
+      #thumb { width: 72px; height: 72px; object-fit: contain; border-radius: 6px;
+               border: 1px solid var(--line); background: var(--panel-2); flex: none; }
+      #fileInput { display: none; }
+
+      /* --- controls --- */
+      .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+                  gap: .8rem; }
+      label { display: block; font-size: .8rem; color: var(--dim); }
+      select {
+        width: 100%; margin-top: .3rem; background: var(--panel-2); color: var(--ink);
+        border: 1px solid var(--line); border-radius: 7px; padding: .45rem .5rem;
+        font: inherit; font-size: .9rem;
+      }
+      .actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center;
+                 margin-top: 1rem; }
+      button {
+        background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
+        border-radius: 8px; padding: .55rem 1rem; font: inherit; font-size: .92rem;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) { border-color: var(--accent); }
+      button:disabled { opacity: .45; cursor: default; }
+      #go { background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+            font-weight: 600; }
+      .link { background: none; border: none; color: var(--accent); text-decoration: underline;
+              padding: 0; font-size: inherit; }
+
+      /* --- progress + stats --- */
+      .bar { height: 6px; background: var(--panel-2); border-radius: 999px;
+             overflow: hidden; margin-top: .9rem; }
+      .fill { height: 100%; width: 0; background: var(--accent); transition: width .12s linear; }
+      #stage { margin: .4rem 0 0; font-size: .82rem; color: var(--dim);
+               font-variant-numeric: tabular-nums; }
+      #error { margin: .9rem 0 0; color: var(--error); font-size: .9rem; }
+      .stats { display: flex; flex-wrap: wrap; gap: 1.4rem; margin: 1rem 0 0;
+               font-variant-numeric: tabular-nums; }
+      .stats div span { display: block; font-size: .74rem; color: var(--dim);
+                        text-transform: uppercase; letter-spacing: .05em; }
+      .stats div b { font-size: 1.05rem; font-weight: 600; }
+
+      /* --- comparison --- */
+      #compare {
+        position: relative; border: 1px solid var(--line); border-radius: 10px;
+        overflow: hidden; background:
+          repeating-conic-gradient(var(--panel-2) 0% 25%, var(--panel) 0% 50%) 50% / 20px 20px;
+        user-select: none; touch-action: none;
+      }
+      #compare img { display: block; width: 100%; height: auto; }
+      #beforeImg { image-rendering: pixelated; }
+      #afterWrap { position: absolute; inset: 0; overflow: hidden; }
+      #afterWrap img { position: absolute; top: 0; left: 0; width: 100%; height: auto; }
+      #handle {
+        position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent);
+        cursor: ew-resize; transform: translateX(-1px);
+      }
+      #handle::after {
+        content: ''; position: absolute; top: 50%; left: 50%; width: 30px; height: 30px;
+        margin: -15px 0 0 -15px; border-radius: 50%; background: var(--accent);
+        box-shadow: 0 1px 6px rgba(0,0,0,.4);
+      }
+      .tag {
+        position: absolute; bottom: .6rem; padding: .15rem .5rem; border-radius: 5px;
+        background: rgba(0,0,0,.6); color: #fff; font-size: .72rem; letter-spacing: .04em;
+        text-transform: uppercase; pointer-events: none;
+      }
+      .tag.l { left: .6rem; } .tag.r { right: .6rem; }
+      .caps { font-size: .78rem; color: var(--dim);
+              font-family: ui-monospace, Menlo, monospace; margin: 0 0 1.4rem; }
+      .note { font-size: .82rem; color: var(--dim); margin: .5rem 0 0; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Upscale an image</h1>
+      <p class="lede">
+        Drop in an image and enlarge it. Everything runs in this tab &mdash; nothing is
+        uploaded anywhere, and it works offline.
+      </p>
+      <p class="caps" id="caps">Checking what this browser supports&hellip;</p>
+
+      <section class="panel">
+        <div id="drop" tabindex="0" role="button" aria-label="Choose or drop an image">
+          <img id="thumb" alt="" hidden />
+          <div id="dropText">
+            <p class="big">Drop an image here, or click to choose one</p>
+            <p class="hint">
+              PNG, JPEG or WebP &middot; or
+              <button type="button" class="link" id="sample">use a test image</button>
+            </p>
+          </div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" />
+      </section>
+
+      <section class="panel">
+        <div class="controls">
+          <label>
+            Scale
+            <select id="scale">
+              <option value="2" selected>2&times;</option>
+              <option value="3">3&times;</option>
+              <option value="4">4&times;</option>
+              <option value="8">8&times;</option>
+            </select>
+          </label>
+          <label>
+            Mode
+            <select id="mode">
+              <option value="balanced" selected>Balanced</option>
+              <option value="natural">Natural (softest)</option>
+              <option value="detail">Detail (punchiest)</option>
+              <option value="document">Document / text</option>
+              <option value="pixel-art">Pixel art</option>
+            </select>
+          </label>
+          <label>
+            Engine
+            <select id="engine">
+              <option value="auto" selected>Auto</option>
+              <option value="classical">Classical</option>
+              <option value="ai">AI</option>
+              <option value="hybrid">Hybrid</option>
+            </select>
+          </label>
+          <label>
+            Output
+            <select id="format">
+              <option value="" selected>Same as input</option>
+              <option value="png">PNG</option>
+              <option value="jpeg">JPEG</option>
+              <option value="webp">WebP</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="go" disabled>Upscale</button>
+          <button id="cancel" disabled>Cancel</button>
+          <button id="download" disabled>Download</button>
+        </div>
+
+        <div id="progress" hidden>
+          <div class="bar"><div class="fill" id="fill"></div></div>
+          <p id="stage"></p>
+        </div>
+        <p id="error" hidden></p>
+
+        <div class="stats" id="stats" hidden></div>
+      </section>
+
+      <section class="panel" id="resultPanel" hidden>
+        <div id="compare">
+          <img id="beforeImg" alt="Original" />
+          <div id="afterWrap"><img id="afterImg" alt="Upscaled" /></div>
+          <div id="handle"></div>
+          <span class="tag l">Original</span>
+          <span class="tag r">Upscaled</span>
+        </div>
+        <p class="note">
+          Drag the divider. Both sides are shown at the same display size, so the left is
+          the original stretched by the browser and the right is the real result.
+        </p>
+      </section>
+    </main>
+
+    <!-- The library. One script tag, no bundler, no npm. -->
+    <script src="../packages/image-upscaler/dist/image-upscaler.min.js"></script>
+    <script>
+      /* global ImageUpscaler */
+      (function () {
+        'use strict';
+        const $ = (id) => document.getElementById(id);
+
+        const upscaler = new ImageUpscaler({
+          // A classic <script> tag has no import.meta.url, so the worker bundle
+          // cannot be found automatically. Without this the library still runs,
+          // just on this thread.
+          workerUrl: new URL(
+            '../packages/image-upscaler/dist/worker.js',
+            document.baseURI,
+          ).href,
+        });
+
+        let file = null;
+        let result = null;
+        let controller = null;
+        let beforeUrl = null;
+        let afterUrl = null;
+
+        // --- capabilities -------------------------------------------------
+
+        ImageUpscaler.detectCapabilities().then((caps) => {
+          $('caps').textContent = [
+            caps.webGPU ? 'GPU acceleration' : 'CPU only',
+            caps.workers ? 'background thread' : 'main thread',
+            `can save ${caps.encodableFormats.join(', ')}`,
+          ].join(' · ');
+        });
+
+        // --- picking a file ------------------------------------------------
+
+        function setFile(next) {
+          file = next;
+          $('go').disabled = !next;
+          clearResult();
+
+          if (beforeUrl) URL.revokeObjectURL(beforeUrl);
+          beforeUrl = URL.createObjectURL(next);
+          $('thumb').src = beforeUrl;
+          $('thumb').hidden = false;
+          $('beforeImg').src = beforeUrl;
+          $('drop').classList.add('has-file');
+
+          const img = new Image();
+          img.onload = () => {
+            $('dropText').innerHTML =
+              `<p class="big">${escapeHtml(next.name)}</p>` +
+              `<p class="hint">${img.naturalWidth} &times; ${img.naturalHeight} · ` +
+              `${(next.size / 1024).toFixed(0)} KiB · click to change</p>`;
+          };
+          img.src = beforeUrl;
+        }
+
+        $('drop').addEventListener('click', () => $('fileInput').click());
+        $('drop').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('fileInput').click(); }
+        });
+        $('fileInput').addEventListener('change', (e) => {
+          if (e.target.files[0]) setFile(e.target.files[0]);
+        });
+
+        ['dragenter', 'dragover'].forEach((type) =>
+          $('drop').addEventListener(type, (e) => {
+            e.preventDefault();
+            $('drop').classList.add('over');
+          }),
+        );
+        ['dragleave', 'drop'].forEach((type) =>
+          $('drop').addEventListener(type, () => $('drop').classList.remove('over')),
+        );
+        $('drop').addEventListener('drop', (e) => {
+          e.preventDefault();
+          const dropped = e.dataTransfer && e.dataTransfer.files[0];
+          if (dropped && dropped.type.startsWith('image/')) setFile(dropped);
+        });
+
+        // A generated image, so the page is usable without hunting for a file.
+        $('sample').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const size = 128;
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const g = ctx.createLinearGradient(0, 0, size, size);
+          g.addColorStop(0, '#1b2540');
+          g.addColorStop(1, '#ed7532');
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, size, size);
+          ctx.strokeStyle = 'rgba(255,255,255,.75)';
+          for (let i = 0; i < size; i += 6) {
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(0, i); ctx.stroke();
+          }
+          ctx.beginPath();
+          ctx.arc(size * 0.72, size * 0.3, size * 0.16, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,.9)';
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 20px system-ui, sans-serif';
+          ctx.fillText('Upscale', 10, size - 30);
+          ctx.font = '10px system-ui, sans-serif';
+          ctx.fillText('fine text 0123456789', 10, size - 14);
+          canvas.toBlob((blob) =>
+            setFile(new File([blob], 'test-image.png', { type: 'image/png' })),
+          'image/png');
+        });
+
+        // --- running ---------------------------------------------------------
+
+        function clearResult() {
+          result = null;
+          $('download').disabled = true;
+          $('stats').hidden = true;
+          $('error').hidden = true;
+          $('resultPanel').hidden = true;
+        }
+
+        $('go').addEventListener('click', async () => {
+          if (!file) return;
+          clearResult();
+          controller = new AbortController();
+          $('go').disabled = true;
+          $('cancel').disabled = false;
+          $('progress').hidden = false;
+          setProgress(0, 'starting');
+
+          const options = {
+            scale: Number($('scale').value),
+            mode: $('mode').value,
+            engine: $('engine').value,
+            signal: controller.signal,
+            onProgress: (p) => {
+              const tiles = p.totalTiles > 1
+                ? ` · tile ${p.currentTile} of ${p.totalTiles}` : '';
+              setProgress(p.progress, p.stage + tiles);
+            },
+          };
+          if ($('format').value) {
+            options.output = { format: $('format').value, quality: 0.92 };
+          }
+
+          try {
+            result = await upscaler.upscale(file, options);
+
+            if (afterUrl) URL.revokeObjectURL(afterUrl);
+            afterUrl = result.toObjectURL();
+            $('afterImg').src = afterUrl;
+            $('resultPanel').hidden = false;
+            // The overlay is absolutely positioned, so it needs the same width
+            // as the element underneath before the clip makes sense.
+            $('afterImg').style.width = `${$('compare').clientWidth}px`;
+            setSplit(50);
+
+            $('download').disabled = false;
+            showStats(result);
+          } catch (err) {
+            if (ImageUpscaler.isCancellation(err)) {
+              $('stage').textContent = 'Cancelled.';
+            } else {
+              $('error').hidden = false;
+              $('error').textContent = explain(err);
+            }
+          } finally {
+            $('go').disabled = !file;
+            $('cancel').disabled = true;
+            controller = null;
+          }
+        });
+
+        $('cancel').addEventListener('click', () => controller && controller.abort());
+        $('download').addEventListener('click', () => result && result.download());
+
+        function setProgress(fraction, label) {
+          $('fill').style.width = `${Math.round(fraction * 100)}%`;
+          $('stage').textContent = `${Math.round(fraction * 100)}% — ${label}`;
+        }
+
+        function showStats(r) {
+          $('stats').hidden = false;
+          $('stats').innerHTML = '';
+          const rows = [
+            ['Result', `${r.width} × ${r.height}`],
+            ['From', `${r.originalWidth} × ${r.originalHeight}`],
+            ['Engine', r.engine],
+            ['Ran on', r.runtime],
+            ['Format', r.format],
+            ['Size', `${(r.blob.size / 1024).toFixed(0)} KiB`],
+            ['Took', `${(r.processingTime / 1000).toFixed(2)} s`],
+          ];
+          for (const [label, value] of rows) {
+            const div = document.createElement('div');
+            div.innerHTML = `<span></span><b></b>`;
+            div.querySelector('span').textContent = label;
+            div.querySelector('b').textContent = value;
+            $('stats').appendChild(div);
+          }
+        }
+
+        function explain(err) {
+          if (!err || !err.code) return String(err);
+          switch (err.code) {
+            case 'MODEL_NOT_INSTALLED':
+              return 'The AI engine needs a 67 MB model downloaded first. ' +
+                     'Switch the engine to Classical, or use the full demo in ' +
+                     'examples/vanilla/ to manage models.';
+            case 'IMAGE_TOO_LARGE':
+            case 'OUT_OF_MEMORY':
+              return `${err.message} Try a smaller scale factor.`;
+            default:
+              return `${err.code}: ${err.message}`;
+          }
+        }
+
+        // --- before/after slider ---------------------------------------------
+
+        function setSplit(percent) {
+          const clamped = Math.max(0, Math.min(100, percent));
+          $('afterWrap').style.width = `${clamped}%`;
+          $('handle').style.left = `${clamped}%`;
+        }
+
+        let dragging = false;
+        const positionFromEvent = (event) => {
+          const rect = $('compare').getBoundingClientRect();
+          const x = (event.touches ? event.touches[0].clientX : event.clientX) - rect.left;
+          return (x / rect.width) * 100;
+        };
+        const start = (e) => { dragging = true; setSplit(positionFromEvent(e)); };
+        const move = (e) => { if (dragging) { e.preventDefault(); setSplit(positionFromEvent(e)); } };
+        const stop = () => { dragging = false; };
+
+        $('compare').addEventListener('pointerdown', start);
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', stop);
+
+        // Keep the overlay aligned when the layout reflows.
+        window.addEventListener('resize', () => {
+          if (afterUrl) $('afterImg').style.width = `${$('compare').clientWidth}px`;
+        });
+
+        function escapeHtml(value) {
+          return String(value).replace(/[&<>"']/g, (c) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+        }
+      })();
+    </script>
+  </body>
+</html>

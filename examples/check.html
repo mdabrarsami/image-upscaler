@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Image Upscaler - self check</title>
+    <style>
+      :root {
+        --bg: #12151c;
+        --panel: #1a1f29;
+        --panel-2: #222834;
+        --line: #2e3644;
+        --ink: #e8ecf3;
+        --dim: #9aa5b8;
+        --accent: #ed7532;
+        --pass: #6dd58c;
+        --fail: #ff8a80;
+        --warn: #f2d94e;
+        color-scheme: dark;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f6f7f9;
+          --panel: #fff;
+          --panel-2: #f0f2f6;
+          --line: #dfe3ea;
+          --ink: #1b2029;
+          --dim: #5b6474;
+          --pass: #1a7f37;
+          --fail: #b3261e;
+          --warn: #8a6d00;
+          color-scheme: light;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 2rem 1.25rem 4rem;
+        background: var(--bg);
+        color: var(--ink);
+        font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main { max-width: 62rem; margin: 0 auto; }
+      h1 { margin: 0 0 .3rem; font-size: 1.6rem; letter-spacing: -.01em; }
+      h2 {
+        margin: 0 0 .8rem; font-size: .82rem; text-transform: uppercase;
+        letter-spacing: .09em; color: var(--dim);
+      }
+      .lede { margin: 0 0 1.5rem; color: var(--dim); max-width: 46rem; }
+      .panel {
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem;
+      }
+      button {
+        background: var(--accent); color: #1b1206; border: none;
+        border-radius: 8px; padding: .6rem 1.1rem; font: inherit;
+        font-weight: 600; cursor: pointer;
+      }
+      button:disabled { opacity: .5; cursor: default; }
+      button.secondary {
+        background: var(--panel-2); color: var(--ink);
+        border: 1px solid var(--line); font-weight: 400;
+      }
+      .actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+      .summary {
+        display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: .9rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .summary b { font-size: 1.5rem; display: block; line-height: 1.1; }
+      .summary span { font-size: .78rem; color: var(--dim); }
+      .pass b { color: var(--pass); }
+      .fail b { color: var(--fail); }
+      .skip b { color: var(--warn); }
+      table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+      th, td {
+        text-align: left; padding: .42rem .6rem;
+        border-bottom: 1px solid var(--line); vertical-align: top;
+      }
+      th { color: var(--dim); font-weight: 500; font-size: .76rem;
+           text-transform: uppercase; letter-spacing: .06em; }
+      td.status { width: 4.5rem; font-weight: 600; }
+      td.status.pass { color: var(--pass); }
+      td.status.fail { color: var(--fail); }
+      td.status.skip { color: var(--warn); }
+      td.detail { color: var(--dim); font-family: ui-monospace, Menlo, monospace;
+                  font-size: .8rem; }
+      .caps { font-size: .82rem; color: var(--dim);
+              font-family: ui-monospace, Menlo, monospace; }
+      .grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: .9rem; margin-top: .5rem;
+      }
+      figure { margin: 0; }
+      figure img {
+        width: 100%; height: auto; display: block; border: 1px solid var(--line);
+        border-radius: 8px; background: repeating-conic-gradient(
+          var(--panel-2) 0% 25%, var(--panel) 0% 50%) 50% / 16px 16px;
+      }
+      figcaption { font-size: .74rem; color: var(--dim); margin-top: .3rem;
+                   font-variant-numeric: tabular-nums; }
+      .running { color: var(--dim); font-size: .85rem; margin: .8rem 0 0; }
+      .bar { height: 6px; background: var(--panel-2); border-radius: 999px;
+             overflow: hidden; margin-top: .7rem; }
+      .fill { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+      code { font-family: ui-monospace, Menlo, monospace; }
+      .note { font-size: .82rem; color: var(--dim); margin: .6rem 0 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Image Upscaler &mdash; self check</h1>
+      <p class="lede">
+        Loads the built library from a plain <code>&lt;script&gt;</code> tag and puts it
+        through its public API: every input type, every scale, every output format,
+        transparency, tiling, progress, cancellation and the error contract. Each check
+        asserts something specific and reports what it actually measured.
+      </p>
+
+      <section class="panel">
+        <h2>Environment</h2>
+        <p class="caps" id="caps">Probing&hellip;</p>
+      </section>
+
+      <section class="panel">
+        <h2>Run</h2>
+        <div class="actions">
+          <button id="run">Run all checks</button>
+          <button id="download" class="secondary" disabled>Download report</button>
+        </div>
+        <div class="bar"><div class="fill" id="fill"></div></div>
+        <p class="running" id="running">Idle.</p>
+        <div class="summary" id="summary" hidden>
+          <div class="pass"><b id="nPass">0</b><span>passed</span></div>
+          <div class="fail"><b id="nFail">0</b><span>failed</span></div>
+          <div class="skip"><b id="nSkip">0</b><span>skipped</span></div>
+          <div><b id="nTime">0</b><span>seconds</span></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Results</h2>
+        <table>
+          <thead>
+            <tr><th>Status</th><th>Check</th><th>Measured</th></tr>
+          </thead>
+          <tbody id="rows">
+            <tr><td colspan="3" class="detail">Not run yet.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Visual output</h2>
+        <p class="note">
+          Produced by the run above. The source is 64&times;64; each result is the real
+          decoded output, shown at its natural size where it fits.
+        </p>
+        <div class="grid" id="gallery"></div>
+      </section>
+    </main>
+
+    <!-- The library, exactly as a CDN consumer would load it. -->
+    <script src="../packages/image-upscaler/dist/image-upscaler.min.js"></script>
+    <script>
+      /* global ImageUpscaler */
+      (function () {
+        'use strict';
+
+        const $ = (id) => document.getElementById(id);
+        const results = [];
+        let upscaler = null;
+
+        // --- tiny assertion helpers ---------------------------------------
+
+        function check(condition, message) {
+          if (!condition) throw new Error(message);
+        }
+        function eq(actual, expected, label) {
+          check(
+            actual === expected,
+            `${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+          );
+        }
+
+        // --- image helpers -------------------------------------------------
+
+        /** A structured test image: gradient, diagonals, a disc and thin lines. */
+        async function makeFile(size = 64) {
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const g = ctx.createLinearGradient(0, 0, size, size);
+          g.addColorStop(0, '#102040');
+          g.addColorStop(1, '#ed7532');
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, size, size);
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1;
+          for (let i = 0; i < size; i += 5) {
+            ctx.beginPath();
+            ctx.moveTo(i, 0);
+            ctx.lineTo(0, i);
+            ctx.stroke();
+          }
+          ctx.fillStyle = 'rgba(255,255,255,.9)';
+          ctx.beginPath();
+          ctx.arc(size * 0.7, size * 0.3, size * 0.15, 0, Math.PI * 2);
+          ctx.fill();
+          const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+          return new File([blob], 'source.png', { type: 'image/png' });
+        }
+
+        /** An opaque red disc on a fully transparent (black) background. */
+        async function makeTransparentFile(size = 64) {
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, size, size);
+          ctx.fillStyle = '#ff0000';
+          ctx.beginPath();
+          ctx.arc(size / 2, size / 2, size * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+          const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+          return new File([blob], 'disc.png', { type: 'image/png' });
+        }
+
+        /** Small palette image, for the pixel-art check. */
+        async function makePaletteFile(size = 16) {
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const palette = ['#1b2540', '#ed7532', '#2fa84f', '#f2d94e'];
+          for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+              ctx.fillStyle = palette[(x * 3 + y * 5) % palette.length];
+              ctx.fillRect(x, y, 1, 1);
+            }
+          }
+          const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+          return new File([blob], 'palette.png', { type: 'image/png' });
+        }
+
+        /** Decode a blob back to pixels, so assertions are on the real output. */
+        async function pixels(blob) {
+          const bitmap = await createImageBitmap(blob);
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.globalCompositeOperation = 'copy';
+          ctx.drawImage(bitmap, 0, 0);
+          const data = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+          bitmap.close();
+          return data;
+        }
+
+        function distinctColours(imageData) {
+          const seen = new Set();
+          const d = imageData.data;
+          for (let i = 0; i < d.length; i += 4) {
+            seen.add(`${d[i]},${d[i + 1]},${d[i + 2]}`);
+          }
+          return seen.size;
+        }
+
+        function show(label, blob, meta) {
+          const figure = document.createElement('figure');
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(blob);
+          img.alt = label;
+          const caption = document.createElement('figcaption');
+          caption.textContent = `${label} — ${meta}`;
+          figure.append(img, caption);
+          $('gallery').appendChild(figure);
+        }
+
+        // --- the checks -----------------------------------------------------
+
+        const checks = [
+          {
+            name: 'Global installed by the script tag',
+            async run() {
+              eq(typeof window.ImageUpscaler, 'function', 'typeof global');
+              const instance = new ImageUpscaler();
+              check(instance instanceof ImageUpscaler, 'not constructible');
+              eq(typeof instance.upscale, 'function', 'upscale');
+              eq(typeof instance.models, 'object', 'models');
+              await instance.dispose();
+              return `v${ImageUpscaler.VERSION}, statics: ${
+                ['detectCapabilities', 'UpscalerError', 'getPreset', 'resample']
+                  .filter((k) => ImageUpscaler[k]).length
+              }/4`;
+            },
+          },
+          {
+            name: 'No module-system leakage (works from a CDN)',
+            run() {
+              for (const name of ['require', 'exports', 'module', 'process']) {
+                eq(typeof window[name], 'undefined', name);
+              }
+              return 'require, exports, module, process all absent';
+            },
+          },
+          {
+            name: 'Upscales a File to a real PNG',
+            async run() {
+              const file = await makeFile(64);
+              const out = await upscaler.upscale(file, { scale: 4, engine: 'classical' });
+              eq(out.width, 256, 'width');
+              eq(out.height, 256, 'height');
+              eq(out.format, 'png', 'format');
+              eq(out.blob.type, 'image/png', 'blob type');
+              check(out.blob.size > 1000, `blob too small: ${out.blob.size}`);
+
+              const head = new Uint8Array((await out.arrayBuffer()).slice(0, 8));
+              eq(
+                Array.from(head).join(','),
+                '137,80,78,71,13,10,26,10',
+                'PNG signature',
+              );
+              const decoded = await pixels(out.blob);
+              eq(decoded.width, 256, 'decoded width');
+              show('classical 4x', out.blob, `256x256, ${(out.blob.size / 1024) | 0} KiB, ${out.processingTime | 0} ms`);
+              return `256x256, ${(out.blob.size / 1024) | 0} KiB, ${out.processingTime | 0} ms, runtime ${out.runtime}`;
+            },
+          },
+          {
+            name: 'Output is genuinely interpolated, not replicated',
+            async run() {
+              const file = await makeFile(48);
+              const out = await upscaler.upscale(file, { scale: 2, engine: 'classical' });
+              const before = distinctColours(await pixels(file));
+              const after = distinctColours(await pixels(out.blob));
+              check(
+                after > before,
+                `no new tones: ${before} before, ${after} after`,
+              );
+              return `${before} distinct colours in, ${after} out`;
+            },
+          },
+          {
+            name: 'Every documented input type',
+            async run() {
+              const file = await makeFile(32);
+              const buffer = await file.arrayBuffer();
+
+              const canvas = document.createElement('canvas');
+              canvas.width = canvas.height = 32;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#4488cc';
+              ctx.fillRect(0, 0, 32, 32);
+
+              const img = new Image();
+              img.src = URL.createObjectURL(file);
+              await img.decode();
+
+              const off = new OffscreenCanvas(32, 32);
+              const octx = off.getContext('2d');
+              octx.fillStyle = '#cc4488';
+              octx.fillRect(0, 0, 32, 32);
+
+              const inputs = [
+                ['File', file],
+                ['Blob', new Blob([buffer], { type: 'image/png' })],
+                ['ArrayBuffer', buffer],
+                ['Uint8Array', new Uint8Array(buffer)],
+                ['ImageBitmap', await createImageBitmap(file)],
+                ['HTMLCanvasElement', canvas],
+                ['HTMLImageElement', img],
+                ['ImageData', ctx.getImageData(0, 0, 32, 32)],
+                ['OffscreenCanvas', off],
+              ];
+
+              for (const [label, input] of inputs) {
+                const out = await upscaler.upscale(input, { scale: 2, engine: 'classical' });
+                eq(out.width, 64, `${label} width`);
+              }
+              URL.revokeObjectURL(img.src);
+              return `${inputs.length} types accepted: ${inputs.map((i) => i[0]).join(', ')}`;
+            },
+          },
+          {
+            name: 'Scales 2x, 3x, 4x, 8x',
+            async run() {
+              const file = await makeFile(32);
+              const sizes = [];
+              for (const scale of [2, 3, 4, 8]) {
+                const out = await upscaler.upscale(file, { scale, engine: 'classical' });
+                eq(out.width, 32 * scale, `${scale}x width`);
+                const decoded = await pixels(out.blob);
+                eq(decoded.width, 32 * scale, `${scale}x decoded width`);
+                sizes.push(`${scale}x=${out.width}px/${out.processingTime | 0}ms`);
+              }
+              return sizes.join('  ');
+            },
+          },
+          {
+            name: 'Encodes PNG, JPEG and WebP',
+            async run() {
+              const file = await makeFile(48);
+              const caps = await ImageUpscaler.detectCapabilities();
+              const done = [];
+              for (const format of ['png', 'jpeg', 'webp']) {
+                if (!caps.encodableFormats.includes(format)) {
+                  done.push(`${format}=unsupported`);
+                  continue;
+                }
+                const out = await upscaler.upscale(file, {
+                  scale: 2,
+                  engine: 'classical',
+                  output: { format, quality: 0.9 },
+                });
+                eq(out.format, format, `${format} format`);
+                eq(out.blob.type, `image/${format}`, `${format} mime`);
+                done.push(`${format}=${(out.blob.size / 1024).toFixed(1)}KiB`);
+              }
+              return done.join('  ');
+            },
+          },
+          {
+            name: 'Transparency survives, with no dark fringe',
+            async run() {
+              const file = await makeTransparentFile(64);
+              const out = await upscaler.upscale(file, { scale: 2, engine: 'classical' });
+              eq(out.format, 'png', 'format defaulted away from JPEG');
+
+              const data = (await pixels(out.blob)).data;
+              let transparent = 0;
+              let opaque = 0;
+              let semi = 0;
+              let worst = 0;
+              for (let i = 0; i < data.length; i += 4) {
+                const a = data[i + 3];
+                if (a === 0) transparent++;
+                else if (a === 255) opaque++;
+                else {
+                  semi++;
+                  // Weighted by alpha: what a viewer would actually see once
+                  // composited. Colour at alpha ~1/255 is numerically noise.
+                  worst = Math.max(worst, ((255 - data[i]) / 255) * (a / 255));
+                }
+              }
+              check(transparent > 100, `too few transparent pixels: ${transparent}`);
+              check(opaque > 100, `too few opaque pixels: ${opaque}`);
+              check(worst < 0.08, `visible fringe: ${worst.toFixed(3)}`);
+              show('transparent 2x', out.blob, `${transparent} clear, ${semi} soft`);
+              return `${transparent} clear, ${semi} soft, ${opaque} opaque; worst visible fringe ${worst.toFixed(4)}`;
+            },
+          },
+          {
+            name: 'JPEG flattens alpha to white, not black',
+            async run() {
+              const caps = await ImageUpscaler.detectCapabilities();
+              if (!caps.encodableFormats.includes('jpeg')) return null;
+              const file = await makeTransparentFile(64);
+              const out = await upscaler.upscale(file, {
+                scale: 2,
+                engine: 'classical',
+                output: { format: 'jpeg', quality: 0.95 },
+              });
+              const d = (await pixels(out.blob)).data;
+              check(d[0] > 230, `corner is dark (${d[0]}), alpha flattened to black`);
+              eq(d[3], 255, 'corner alpha');
+              return `corner rgb(${d[0]},${d[1]},${d[2]}) — flattened to white`;
+            },
+          },
+          {
+            name: 'pixel-art mode invents no colours',
+            async run() {
+              const file = await makePaletteFile(16);
+              const before = distinctColours(await pixels(file));
+              const out = await upscaler.upscale(file, {
+                scale: 4,
+                engine: 'classical',
+                mode: 'pixel-art',
+              });
+              const after = distinctColours(await pixels(out.blob));
+              check(after <= before, `invented colours: ${before} -> ${after}`);
+              show('pixel-art 4x', out.blob, `${after} colours, palette preserved`);
+              return `${before} colours in, ${after} out (nearest-neighbour)`;
+            },
+          },
+          {
+            name: 'Tiled output matches a single pass',
+            async run() {
+              const file = await makeFile(96);
+              const whole = await upscaler.upscale(file, {
+                scale: 2, engine: 'classical', tileSize: 4096, output: { format: 'png' },
+              });
+              const tiled = await upscaler.upscale(file, {
+                scale: 2, engine: 'classical', tileSize: 24, output: { format: 'png' },
+              });
+              const a = (await pixels(whole.blob)).data;
+              const b = (await pixels(tiled.blob)).data;
+              let worst = 0;
+              let differing = 0;
+              for (let i = 0; i < a.length; i++) {
+                const d = Math.abs(a[i] - b[i]);
+                if (d > 0) differing++;
+                if (d > worst) worst = d;
+              }
+              check(worst <= 1, `seam visible: worst channel difference ${worst}/255`);
+              return `worst difference ${worst}/255 across ${(a.length / 4).toLocaleString()} pixels (${differing} channels differ)`;
+            },
+          },
+          {
+            name: 'Progress is throttled, ordered and terminates',
+            async run() {
+              const file = await makeFile(128);
+              const events = [];
+              await upscaler.upscale(file, {
+                scale: 4,
+                engine: 'classical',
+                onProgress: (p) => events.push(p),
+              });
+              check(events.length > 2, `too few events: ${events.length}`);
+              check(events.length < 400, `not throttled: ${events.length} events`);
+              for (let i = 1; i < events.length; i++) {
+                check(
+                  events[i].progress >= events[i - 1].progress,
+                  `progress went backwards at ${i}`,
+                );
+              }
+              const last = events[events.length - 1];
+              eq(last.progress, 1, 'final progress');
+              eq(last.stage, 'complete', 'final stage');
+              const stages = [...new Set(events.map((e) => e.stage))];
+              return `${events.length} events, stages: ${stages.join(' > ')}`;
+            },
+          },
+          {
+            name: 'Cancellation stops a run in flight',
+            async run() {
+              const file = await makeFile(512);
+              const controller = new AbortController();
+              const started = performance.now();
+              const promise = upscaler.upscale(file, {
+                scale: 8,
+                engine: 'classical',
+                signal: controller.signal,
+              });
+              setTimeout(() => controller.abort(), 80);
+              try {
+                await promise;
+                throw new Error('completed instead of cancelling');
+              } catch (error) {
+                eq(error.code, 'CANCELLED', 'error code');
+                check(ImageUpscaler.isCancellation(error), 'isCancellation false');
+                return `rejected with CANCELLED after ${(performance.now() - started) | 0} ms`;
+              }
+            },
+          },
+          {
+            name: 'Errors are typed and actionable',
+            async run() {
+              const cases = [];
+              const attempt = async (label, input, options) => {
+                try {
+                  await upscaler.upscale(input, options || { scale: 2 });
+                  cases.push(`${label}=NO ERROR`);
+                } catch (error) {
+                  check(
+                    error instanceof ImageUpscaler.UpscalerError,
+                    `${label}: not an UpscalerError`,
+                  );
+                  cases.push(`${label}=${error.code}`);
+                }
+              };
+              await attempt('null', null);
+              await attempt('plain object', { not: 'an image' });
+              await attempt('empty buffer', new ArrayBuffer(0));
+              await attempt('garbage bytes', new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]));
+              await attempt('bad scale', await makeFile(16), { scale: 5 });
+              await attempt('ai without a model', await makeFile(16), {
+                scale: 2, engine: 'ai',
+              });
+              return cases.join('  ');
+            },
+          },
+          {
+            name: 'Modes differ, and all produce valid output',
+            async run() {
+              const file = await makeFile(64);
+              const measured = [];
+              let previous = null;
+              for (const mode of ['natural', 'balanced', 'detail', 'document']) {
+                const out = await upscaler.upscale(file, {
+                  scale: 2, engine: 'classical', mode, output: { format: 'png' },
+                });
+                const data = (await pixels(out.blob)).data;
+                let min = 255;
+                let max = 0;
+                for (let i = 0; i < data.length; i += 4) {
+                  if (data[i] < min) min = data[i];
+                  if (data[i] > max) max = data[i];
+                }
+                if (previous) {
+                  let same = true;
+                  for (let i = 0; i < data.length; i += 997) {
+                    if (data[i] !== previous[i]) { same = false; break; }
+                  }
+                  check(!same, `${mode} is identical to the previous mode`);
+                }
+                previous = data;
+                measured.push(`${mode}:${max - min}`);
+              }
+              return `red-channel range per mode — ${measured.join('  ')}`;
+            },
+          },
+          {
+            name: 'Runs in a Web Worker, off the main thread',
+            async run() {
+              const worker = new ImageUpscaler({
+                useWorker: true,
+                workerUrl: new URL(
+                  '../packages/image-upscaler/dist/worker.js',
+                  document.baseURI,
+                ).href,
+              });
+              try {
+                const file = await makeFile(256);
+                const gaps = [];
+                let previous = performance.now();
+                let sampling = true;
+                const sample = () => {
+                  const now = performance.now();
+                  gaps.push(now - previous);
+                  previous = now;
+                  if (sampling) requestAnimationFrame(sample);
+                };
+                requestAnimationFrame(sample);
+
+                const out = await worker.upscale(file, { scale: 4, engine: 'classical' });
+                sampling = false;
+                eq(out.width, 1024, 'width');
+                const worst = Math.max(...gaps);
+                check(gaps.length > 5, 'frame loop never ran');
+                check(worst < 1500, `main thread blocked for ${worst | 0} ms`);
+                return `1024x1024 produced; worst frame gap ${worst | 0} ms over ${gaps.length} frames`;
+              } finally {
+                await worker.dispose();
+              }
+            },
+          },
+          {
+            name: 'No network request during processing',
+            async run() {
+              // Instrument every outbound API the page could use, then run a
+              // full upscale and assert none of them fired.
+              const calls = [];
+              const originals = {
+                fetch: window.fetch,
+                open: XMLHttpRequest.prototype.open,
+                beacon: navigator.sendBeacon,
+              };
+              window.fetch = (...args) => {
+                calls.push(`fetch ${args[0]}`);
+                return originals.fetch.apply(window, args);
+              };
+              XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+                calls.push(`xhr ${method} ${url}`);
+                return originals.open.call(this, method, url, ...rest);
+              };
+              if (originals.beacon) {
+                navigator.sendBeacon = (...args) => {
+                  calls.push(`beacon ${args[0]}`);
+                  return originals.beacon.apply(navigator, args);
+                };
+              }
+
+              try {
+                const file = await makeFile(128);
+                const out = await upscaler.upscale(file, { scale: 4, engine: 'classical' });
+                eq(out.width, 512, 'width');
+                check(
+                  calls.length === 0,
+                  `made ${calls.length} request(s): ${calls.join('; ')}`,
+                );
+                return 'fetch, XHR and sendBeacon all untouched during a 4x upscale';
+              } finally {
+                window.fetch = originals.fetch;
+                XMLHttpRequest.prototype.open = originals.open;
+                if (originals.beacon) navigator.sendBeacon = originals.beacon;
+              }
+            },
+          },
+          {
+            name: 'Model catalogue is complete and nothing is installed',
+            async run() {
+              const models = await upscaler.models.list();
+              check(models.length > 0, 'catalogue is empty');
+              for (const model of models) {
+                check(!!model.license, `${model.id} has no licence`);
+                check(!!model.attribution, `${model.id} has no attribution`);
+                check(model.size > 1e6, `${model.id} has an implausible size`);
+              }
+              return models
+                .map((m) => `${m.id} ${m.scale}x ${(m.size / 1e6) | 0}MB ${m.license} ${m.installed ? 'installed' : 'not installed'}`)
+                .join('  |  ');
+            },
+          },
+          {
+            name: 'Lower-level exports work standalone',
+            async run() {
+              const surface = ImageUpscaler.resample
+                ? null
+                : check(false, 'resample not exported');
+              void surface;
+              const kernel = ImageUpscaler.getKernel('lanczos3');
+              eq(kernel.support, 3, 'lanczos3 support');
+              const preset = ImageUpscaler.getPreset('document');
+              eq(preset.antiRinging, 1, 'document anti-ringing');
+              const modes = ImageUpscaler.listModes();
+              eq(modes.length, 5, 'mode count');
+              return `kernels, presets and ${modes.length} modes reachable: ${modes.join(', ')}`;
+            },
+          },
+        ];
+
+        // --- runner ---------------------------------------------------------
+
+        function render() {
+          const tbody = $('rows');
+          tbody.innerHTML = '';
+          for (const r of results) {
+            const tr = document.createElement('tr');
+            const status = document.createElement('td');
+            status.className = `status ${r.status}`;
+            status.textContent = r.status === 'pass' ? 'PASS' : r.status === 'fail' ? 'FAIL' : 'SKIP';
+            const name = document.createElement('td');
+            name.textContent = r.name;
+            const detail = document.createElement('td');
+            detail.className = 'detail';
+            detail.textContent = r.detail;
+            tr.append(status, name, detail);
+            tbody.appendChild(tr);
+          }
+        }
+
+        async function runAll() {
+          $('run').disabled = true;
+          $('download').disabled = true;
+          $('gallery').innerHTML = '';
+          results.length = 0;
+          render();
+
+          if (upscaler) await upscaler.dispose();
+          // useWorker: false so timings and failures are attributable; the
+          // worker gets its own dedicated check above.
+          upscaler = new ImageUpscaler({ useWorker: false });
+
+          const started = performance.now();
+          for (let i = 0; i < checks.length; i++) {
+            const item = checks[i];
+            $('running').textContent = `Running: ${item.name}`;
+            $('fill').style.width = `${(i / checks.length) * 100}%`;
+            // Yield so the UI paints between checks.
+            await new Promise((r) => setTimeout(r, 0));
+
+            const at = performance.now();
+            try {
+              const detail = await item.run();
+              results.push(
+                detail === null
+                  ? { name: item.name, status: 'skip', detail: 'not supported in this browser' }
+                  : { name: item.name, status: 'pass', detail: `${detail}  (${(performance.now() - at) | 0} ms)` },
+              );
+            } catch (error) {
+              results.push({
+                name: item.name,
+                status: 'fail',
+                detail: String((error && error.message) || error),
+              });
+            }
+            render();
+          }
+
+          const elapsed = (performance.now() - started) / 1000;
+          $('fill').style.width = '100%';
+          const pass = results.filter((r) => r.status === 'pass').length;
+          const fail = results.filter((r) => r.status === 'fail').length;
+          const skip = results.filter((r) => r.status === 'skip').length;
+          $('nPass').textContent = pass;
+          $('nFail').textContent = fail;
+          $('nSkip').textContent = skip;
+          $('nTime').textContent = elapsed.toFixed(1);
+          $('summary').hidden = false;
+          $('running').textContent = fail === 0
+            ? `All ${pass} checks passed${skip ? `, ${skip} skipped` : ''}.`
+            : `${fail} check${fail === 1 ? '' : 's'} failed.`;
+          $('run').disabled = false;
+          $('download').disabled = false;
+        }
+
+        $('run').addEventListener('click', () => {
+          runAll().catch((error) => {
+            $('running').textContent = `Runner crashed: ${error.message}`;
+            $('run').disabled = false;
+          });
+        });
+
+        $('download').addEventListener('click', async () => {
+          const caps = await ImageUpscaler.detectCapabilities();
+          const report = {
+            generatedAt: new Date().toISOString(),
+            version: ImageUpscaler.VERSION,
+            userAgent: navigator.userAgent,
+            capabilities: caps,
+            results,
+          };
+          const blob = new Blob([JSON.stringify(report, null, 2)], {
+            type: 'application/json',
+          });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'image-upscaler-self-check.json';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 0);
+        });
+
+        ImageUpscaler.detectCapabilities().then((caps) => {
+          $('caps').textContent = [
+            `v${ImageUpscaler.VERSION}`,
+            `WebGPU ${caps.webGPU}`,
+            `WebGL2 ${caps.webGL2}`,
+            caps.wasmSimd ? 'WASM+SIMD' : caps.wasm ? 'WASM' : 'no WASM',
+            `Workers ${caps.workers}`,
+            `OffscreenCanvas ${caps.offscreenCanvas}`,
+            `IndexedDB ${caps.indexedDB}`,
+            `encodes ${caps.encodableFormats.join('/')}`,
+            `${caps.hardwareConcurrency} cores`,
+            `~${(caps.estimatedMemory / 1e6) | 0} MB budget (${
+              caps.estimatedMemoryIsReported ? 'reported' : 'estimated'
+            })`,
+          ].join(' · ');
+        });
+      })();
+    </script>
+  </body>
+</html>

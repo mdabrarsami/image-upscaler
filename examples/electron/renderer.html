@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Image Upscaler - Electron</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 2rem;
+        background: #12151c;
+        color: #e8ecf3;
+        font: 15px/1.5 system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 1.3rem;
+        margin: 0 0 0.5rem;
+      }
+      pre {
+        background: #1a1f29;
+        border: 1px solid #2e3644;
+        border-radius: 8px;
+        padding: 0.9rem;
+        overflow: auto;
+        font-size: 0.85rem;
+      }
+      img {
+        max-width: 100%;
+        border: 1px solid #2e3644;
+        border-radius: 8px;
+        image-rendering: pixelated;
+      }
+      .ok {
+        color: #6dd58c;
+      }
+      .fail {
+        color: #ff8a80;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Image Upscaler in Electron</h1>
+    <p id="status">Running&hellip;</p>
+    <pre id="output"></pre>
+    <img id="result" alt="Upscaled result" />
+
+    <!--
+      The same prebuilt ESM bundle a browser would load. No Electron build, no
+      Node APIs, no preload bridge for the library itself.
+    -->
+    <script type="module">
+      import { ImageUpscaler, detectCapabilities, detectEnvironment } from '../../packages/image-upscaler/dist/image-upscaler.esm.js';
+
+      const status = document.getElementById('status');
+      const output = document.getElementById('output');
+      const image = document.getElementById('result');
+
+      async function run() {
+        const size = 96;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, size, size);
+        gradient.addColorStop(0, '#1b2540');
+        gradient.addColorStop(1, '#ed7532');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+        ctx.strokeStyle = '#fff';
+        for (let i = 0; i < size; i += 6) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(0, i);
+          ctx.stroke();
+        }
+
+        const capabilities = await detectCapabilities();
+        // A Worker inside a `file://` renderer needs a resolvable URL; the
+        // bundler-emitted path works because this page is a module.
+        const upscaler = new ImageUpscaler({ useWorker: false });
+        const result = await upscaler.upscale(canvas, { scale: 4, engine: 'classical' });
+        image.src = URL.createObjectURL(result.blob);
+        await upscaler.dispose();
+
+        return {
+          ok: true,
+          environment: detectEnvironment(),
+          width: result.width,
+          height: result.height,
+          engine: result.engine,
+          runtime: result.runtime,
+          format: result.format,
+          bytes: result.blob.size,
+          processingTime: Math.round(result.processingTime),
+          capabilities: {
+            webGPU: capabilities.webGPU,
+            webGL2: capabilities.webGL2,
+            workers: capabilities.workers,
+            offscreenCanvas: capabilities.offscreenCanvas,
+            wasm: capabilities.wasm,
+          },
+        };
+      }
+
+      run()
+        .then((payload) => {
+          status.textContent = 'Upscaled 96x96 to 384x384 in the renderer process.';
+          status.className = 'ok';
+          output.textContent = JSON.stringify(payload, null, 2);
+          // Read by the Playwright harness and by `npm start`.
+          window.__upscalerResult = payload;
+        })
+        .catch((error) => {
+          const payload = { ok: false, code: error?.code, message: String(error?.message ?? error) };
+          status.textContent = payload.message;
+          status.className = 'fail';
+          output.textContent = JSON.stringify(payload, null, 2);
+          window.__upscalerResult = payload;
+        });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "image-upscaler-electron-example",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Minimal Electron host proving the core package runs unmodified in a renderer process.",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron ."
+  }
+}
