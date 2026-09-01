@@ -1,0 +1,46 @@
+{
+  "name": "image-upscaler-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Client-side image upscaling SDK (classical + local AI), framework agnostic.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "examples/react"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc -p packages/image-upscaler --noEmit && tsc -p packages/image-upscaler-react --noEmit && tsc -p examples/react --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "build": "npm run build --workspace @smartapp/image-upscaler && npm run build --workspace @smartapp/image-upscaler-react",
+    "build:demo": "npm run build --workspace image-upscaler-react-example",
+    "benchmark": "node benchmarks/run.mjs",
+    "benchmark:ai": "node benchmarks/run.mjs --ai",
+    "benchmark:docs": "node benchmarks/update-docs.mjs",
+    "test:all": "npm run lint && npm run typecheck && npm run test && npm run build && npm run build:demo && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^22.7.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "eslint": "^9.13.0",
+    "globals": "^17.11.0",
+    "onnxruntime-web": "^1.29.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.10.0",
+    "vitest": "^2.1.0"
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true,
+    "esbuild@0.21.5": true,
+    "electron@33.4.11": true
+  }
+}

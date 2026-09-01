@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.playwright/
+playwright-report/
+test-results/
+# Benchmark results are committed on purpose. `latest.json` is the record the
+# documentation tables are generated from, so dropping it would leave the
+# numbers in docs/PERFORMANCE.md with no reproducible source.
+
+# tsc has been known to emit beside the sources here; keep the artefacts out.
+examples/react/src/*.js
+examples/react/src/*.d.ts
+examples/react/**/*.map
+examples/react/dist/
