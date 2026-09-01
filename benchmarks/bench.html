@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Image Upscaler benchmark harness</title>
+  </head>
+  <body>
+    <p>Benchmark harness. Driven from <code>benchmarks/run.mjs</code>.</p>
+    <script type="module">
+      import * as lib from '/packages/image-upscaler/dist/image-upscaler.esm.js';
+
+      const { ImageUpscaler, detectCapabilities } = lib;
+
+      const ORT_DIR = '/node_modules/onnxruntime-web/dist/';
+      const onnxRuntimeLoader = async () => {
+        const ort = await import(`${ORT_DIR}ort.wasm.bundle.min.mjs`);
+        ort.env.wasm.wasmPaths = ORT_DIR;
+        return ort;
+      };
+
+      /**
+       * A synthetic photograph.
+       *
+       * Procedural rather than a real photo so the numbers are reproducible on
+       * any machine and the repo carries no binary fixtures. It deliberately
+       * contains the four things that separate upscalers: smooth gradients,
+       * hard geometric edges, fine repeating structure, and text.
+       */
+      function drawScene(ctx, width, height) {
+        let seed = 7;
+        const rand = () => {
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          return seed / 0x100000000;
+        };
+
+        const sky = ctx.createLinearGradient(0, 0, width * 0.3, height);
+        sky.addColorStop(0, '#0d1b3a');
+        sky.addColorStop(0.55, '#ed7532');
+        sky.addColorStop(1, '#2b1608');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, width, height);
+
+        // Rotated rectangles rather than axis-aligned ones.
+        //
+        // This matters more than it looks. An earlier version of this scene
+        // drew everything on the pixel grid, and nearest-neighbour scored the
+        // best SSIM of any method - not because it reconstructs well, but
+        // because a grid-aligned edge halved and doubled lands back exactly
+        // where it started. Rotation removes that free win and makes the
+        // comparison about interpolation quality instead of luck.
+        for (let i = 0; i < 26; i++) {
+          const w = width * (0.04 + rand() * 0.10);
+          const h = height * (0.10 + rand() * 0.35);
+          ctx.save();
+          ctx.translate(rand() * width, height * (0.45 + rand() * 0.5));
+          ctx.rotate((rand() - 0.5) * 0.7);
+          ctx.fillStyle = `rgb(${(20 + rand() * 40) | 0}, ${(24 + rand() * 40) | 0}, ${(38 + rand() * 40) | 0})`;
+          ctx.fillRect(-w / 2, -h / 2, w, h);
+          // Fine repeating structure, also rotated.
+          ctx.fillStyle = 'rgba(255, 226, 168, 0.85)';
+          for (let wy = -h / 2 + 5; wy < h / 2 - 4; wy += 9) {
+            for (let wx = -w / 2 + 4; wx < w / 2 - 4; wx += 7) {
+              if (rand() > 0.45) ctx.fillRect(wx, wy, 3, 4);
+            }
+          }
+          ctx.restore();
+        }
+
+        // Curves: continuous, sub-pixel, and impossible to fake with
+        // replication.
+        ctx.lineWidth = Math.max(1, height * 0.004);
+        for (let i = 0; i < 14; i++) {
+          ctx.strokeStyle = `rgba(255,255,255,${0.25 + rand() * 0.5})`;
+          ctx.beginPath();
+          ctx.arc(rand() * width, rand() * height, height * (0.05 + rand() * 0.3), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Off-axis hatching at an irrational-ish angle.
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 1;
+        for (let i = -height; i < width; i += 29) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i + height * 0.618, height);
+          ctx.stroke();
+        }
+
+        // A faint noise field, so nothing in the image is perfectly flat.
+        const grain = ctx.getImageData(0, 0, width, height);
+        for (let i = 0; i < grain.data.length; i += 4) {
+          const n = (rand() - 0.5) * 10;
+          grain.data[i] += n;
+          grain.data[i + 1] += n;
+          grain.data[i + 2] += n;
+        }
+        ctx.putImageData(grain, 0, 0);
+
+        // Text, rotated very slightly off the horizontal.
+        ctx.save();
+        ctx.translate(width * 0.04, height * 0.12);
+        ctx.rotate(-0.03);
+        ctx.fillStyle = '#ffffff';
+        const fontSize = Math.max(10, Math.round(height * 0.045));
+        ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+        ctx.fillText('Upscaling 0123456789', 0, 0);
+        ctx.font = `${Math.max(8, Math.round(fontSize * 0.5))}px system-ui, sans-serif`;
+        ctx.fillText('fine text for acuity measurement', 0, Math.round(height * 0.05));
+        ctx.restore();
+      }
+
+      function makeCanvas(width, height) {
+        const canvas = new OffscreenCanvas(width, height);
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        drawScene(ctx, width, height);
+        return canvas;
+      }
+
+      function imageDataOf(canvas) {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        return ctx.getImageData(0, 0, canvas.width, canvas.height);
+      }
+
+      /** Canvas `drawImage`, the baseline every browser already offers. */
+      function canvasResize(source, width, height, smoothing = 'high') {
+        const out = new OffscreenCanvas(width, height);
+        const ctx = out.getContext('2d', { willReadFrequently: true });
+        ctx.imageSmoothingEnabled = smoothing !== 'none';
+        if (smoothing !== 'none') ctx.imageSmoothingQuality = smoothing;
+        ctx.drawImage(source, 0, 0, width, height);
+        return out;
+      }
+
+      /**
+       * Band-limited reduction using the library's own resampler, in linear
+       * light with premultiplied alpha - the same conventions the upscale path
+       * uses, so the round trip is symmetric.
+       */
+      async function downscale(sourceCanvas, factor) {
+        const ctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+        const image = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+
+        const surface = lib.surfaceFromImageData(image);
+        lib.toLinear(surface);
+        lib.premultiply(surface);
+        const small = lib.resample(
+          surface,
+          Math.round(sourceCanvas.width / factor),
+          Math.round(sourceCanvas.height / factor),
+          { kernel: lib.getKernel('lanczos3') },
+        );
+        lib.unpremultiply(small);
+        lib.toSrgb(small);
+
+        const out = new OffscreenCanvas(small.width, small.height);
+        const octx = out.getContext('2d', { willReadFrequently: true });
+        octx.putImageData(lib.surfaceToImageData(small), 0, 0);
+        return out.convertToBlob({ type: 'image/png' });
+      }
+
+      // --- quality metrics ---------------------------------------------------
+
+      function toLuma(data) {
+        const out = new Float64Array(data.length / 4);
+        for (let p = 0, i = 0; p < out.length; p++, i += 4) {
+          out[p] = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        }
+        return out;
+      }
+
+      function metrics(a, b) {
+        if (a.width !== b.width || a.height !== b.height) {
+          throw new Error(`size mismatch ${a.width}x${a.height} vs ${b.width}x${b.height}`);
+        }
+        let se = 0;
+        let ae = 0;
+        let count = 0;
+        for (let i = 0; i < a.data.length; i += 4) {
+          for (let c = 0; c < 3; c++) {
+            const d = a.data[i + c] - b.data[i + c];
+            se += d * d;
+            ae += Math.abs(d);
+            count++;
+          }
+        }
+        const mse = se / count;
+        const mae = ae / count;
+        const psnr = mse === 0 ? Infinity : 10 * Math.log10((255 * 255) / mse);
+        return { mse, mae, psnr, ssim: ssim(a, b) };
+      }
+
+      /** Windowed SSIM on luma, 8x8 blocks, standard constants. */
+      function ssim(a, b) {
+        const la = toLuma(a.data);
+        const lb = toLuma(b.data);
+        const C1 = (0.01 * 255) ** 2;
+        const C2 = (0.03 * 255) ** 2;
+        const win = 8;
+        let total = 0;
+        let windows = 0;
+        for (let y = 0; y + win <= a.height; y += win) {
+          for (let x = 0; x + win <= a.width; x += win) {
+            let sa = 0;
+            let sb = 0;
+            let saa = 0;
+            let sbb = 0;
+            let sab = 0;
+            const n = win * win;
+            for (let dy = 0; dy < win; dy++) {
+              for (let dx = 0; dx < win; dx++) {
+                const i = (y + dy) * a.width + (x + dx);
+                sa += la[i];
+                sb += lb[i];
+                saa += la[i] * la[i];
+                sbb += lb[i] * lb[i];
+                sab += la[i] * lb[i];
+              }
+            }
+            const ma = sa / n;
+            const mb = sb / n;
+            const va = saa / n - ma * ma;
+            const vb = sbb / n - mb * mb;
+            const cab = sab / n - ma * mb;
+            total +=
+              ((2 * ma * mb + C1) * (2 * cab + C2)) /
+              ((ma * ma + mb * mb + C1) * (va + vb + C2));
+            windows++;
+          }
+        }
+        return windows ? total / windows : 1;
+      }
+
+      // --- harness -----------------------------------------------------------
+
+      function makeUpscaler(extra = {}) {
+        return new ImageUpscaler({ useWorker: false, onnxRuntimeLoader, ...extra });
+      }
+
+      /**
+       * Run one throughput case.
+       *
+       * `warmup` runs are discarded: the first call through any path pays for
+       * weight-table construction, JIT warm-up and (for AI) session creation,
+       * and reporting that as steady-state throughput would be misleading.
+       */
+      async function timeCase({ width, height, scale, engine, mode, runs, warmup, tileSize }) {
+        const source = makeCanvas(width, height);
+        const upscaler = makeUpscaler();
+        const samples = [];
+        let result = null;
+        let tiles = 0;
+
+        try {
+          for (let i = 0; i < warmup + runs; i++) {
+            const started = performance.now();
+            result = await upscaler.upscale(source, {
+              scale,
+              engine,
+              mode,
+              ...(tileSize ? { tileSize } : {}),
+              output: { format: 'png' },
+              onProgress: (p) => {
+                if (p.totalTiles) tiles = p.totalTiles;
+              },
+            });
+            const elapsed = performance.now() - started;
+            if (i >= warmup) samples.push(elapsed);
+          }
+          samples.sort((x, y) => x - y);
+          return {
+            ok: true,
+            width,
+            height,
+            scale,
+            engine,
+            mode,
+            outputWidth: result.width,
+            outputHeight: result.height,
+            runtime: result.runtime,
+            engineUsed: result.engine,
+            tiles,
+            median: samples[Math.floor(samples.length / 2)],
+            min: samples[0],
+            max: samples[samples.length - 1],
+            megapixelsPerSecond:
+              (result.width * result.height) /
+              1e6 /
+              (samples[Math.floor(samples.length / 2)] / 1000),
+          };
+        } catch (error) {
+          return {
+            ok: false,
+            width,
+            height,
+            scale,
+            engine,
+            mode,
+            code: error?.code ?? 'UNKNOWN',
+            message: String(error?.message ?? error),
+          };
+        } finally {
+          await upscaler.dispose();
+        }
+      }
+
+      /** Canvas drawImage baseline, timed the same way. */
+      async function timeCanvas({ width, height, scale, runs, warmup }) {
+        const source = makeCanvas(width, height);
+        const samples = [];
+        for (let i = 0; i < warmup + runs; i++) {
+          const started = performance.now();
+          const out = canvasResize(source, width * scale, height * scale);
+          // Include the encode, so it is comparable with the library, which
+          // always returns an encoded blob.
+          await out.convertToBlob({ type: 'image/png' });
+          const elapsed = performance.now() - started;
+          if (i >= warmup) samples.push(elapsed);
+        }
+        samples.sort((x, y) => x - y);
+        return {
+          ok: true,
+          width,
+          height,
+          scale,
+          engine: 'canvas-drawImage',
+          mode: '-',
+          outputWidth: width * scale,
+          outputHeight: height * scale,
+          runtime: 'cpu',
+          engineUsed: 'canvas',
+          tiles: 0,
+          median: samples[Math.floor(samples.length / 2)],
+          min: samples[0],
+          max: samples[samples.length - 1],
+          megapixelsPerSecond:
+            (width * scale * height * scale) /
+            1e6 /
+            (samples[Math.floor(samples.length / 2)] / 1000),
+        };
+      }
+
+      /**
+       * Quality: build a reference at full size, shrink it, enlarge it back,
+       * and score the reconstruction against the reference.
+       *
+       * This is the only honest way to score an upscaler. Comparing two
+       * enlargements to each other tells you they differ, not which is right.
+       */
+      async function qualityCase({ width, height, scale, methods }) {
+        const reference = makeCanvas(width, height);
+        const referenceData = imageDataOf(reference);
+
+        // The downscale is the library's own Lanczos, in linear light with
+        // premultiplied alpha.
+        //
+        // Using canvas here would quietly favour the canvas methods: they would
+        // be inverting a filter from the same family that produced the input,
+        // while everything else would not. A neutral, properly band-limited
+        // reduction gives every method the same starting point.
+        const upscaler = makeUpscaler();
+        const smallBlob = await downscale(reference, scale);
+
+        const rows = [];
+        for (const method of methods) {
+          try {
+            let outData;
+            if (method.kind === 'raw') {
+              // Bare resampler, bypassing the engine entirely. Lets a run
+              // isolate the effect of a single choice - the working colour
+              // space, or the kernel - from everything the pipeline adds.
+              const bitmap = await createImageBitmap(smallBlob);
+              const src = new OffscreenCanvas(bitmap.width, bitmap.height);
+              const sctx = src.getContext('2d', { willReadFrequently: true });
+              sctx.globalCompositeOperation = 'copy';
+              sctx.drawImage(bitmap, 0, 0);
+              const surface = lib.surfaceFromImageData(
+                sctx.getImageData(0, 0, bitmap.width, bitmap.height),
+              );
+              bitmap.close();
+
+              if (method.linear) lib.toLinear(surface);
+              lib.premultiply(surface);
+              const enlarged = lib.resample(surface, width, height, {
+                kernel: lib.getKernel(method.kernel),
+              });
+              lib.unpremultiply(enlarged);
+              if (method.linear) lib.toSrgb(enlarged);
+              outData = lib.surfaceToImageData(enlarged);
+            } else if (method.kind === 'canvas') {
+              const bitmap = await createImageBitmap(smallBlob);
+              const out = canvasResize(bitmap, width, height, method.smoothing);
+              bitmap.close();
+              outData = imageDataOf(out);
+            } else {
+              const result = await upscaler.upscale(smallBlob, {
+                scale,
+                engine: method.engine,
+                mode: method.mode,
+                ...(method.model ? { model: method.model } : {}),
+                // Per-call tuning overrides, so a run can isolate one stage of
+                // the pipeline rather than only comparing whole presets.
+                ...(method.tuning ?? {}),
+                output: { format: 'png' },
+              });
+              const bitmap = await createImageBitmap(result.blob);
+              const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+              const ctx = canvas.getContext('2d', { willReadFrequently: true });
+              ctx.globalCompositeOperation = 'copy';
+              ctx.drawImage(bitmap, 0, 0);
+              outData = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+              bitmap.close();
+            }
+            rows.push({ ok: true, label: method.label, ...metrics(outData, referenceData) });
+          } catch (error) {
+            rows.push({
+              ok: false,
+              label: method.label,
+              code: error?.code ?? 'UNKNOWN',
+              message: String(error?.message ?? error),
+            });
+          }
+        }
+        await upscaler.dispose();
+        return { width, height, scale, rows };
+      }
+
+      async function ensureModel(id) {
+        const upscaler = makeUpscaler();
+        try {
+          await upscaler.models.download(id);
+          return true;
+        } catch {
+          return false;
+        } finally {
+          await upscaler.dispose();
+        }
+      }
+
+      window.bench = {
+        detectCapabilities,
+        timeCase,
+        timeCanvas,
+        qualityCase,
+        ensureModel,
+      };
+      window.benchReady = true;
+    </script>
+  </body>
+</html>
