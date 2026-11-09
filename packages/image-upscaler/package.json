@@ -1,5 +1,5 @@
 {
-  "name": "@smartapp/image-upscaler",
+  "name": "@mdabrarsami/image-upscaler",
   "version": "0.1.0",
   "description": "Framework-agnostic, fully client-side image upscaling SDK. Classical (Lanczos/EDI/detail-reconstruction) plus optional local AI super-resolution. No backend, no API key, images never leave the device.",
   "license": "MIT",

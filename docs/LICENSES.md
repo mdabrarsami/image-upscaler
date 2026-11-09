@@ -4,8 +4,8 @@
 
 MIT, for both packages:
 
-- `@smartapp/image-upscaler`
-- `@smartapp/image-upscaler-react`
+- `@mdabrarsami/image-upscaler`
+- `@mdabrarsami/image-upscaler-react`
 
 See [LICENSE](../LICENSE).
 

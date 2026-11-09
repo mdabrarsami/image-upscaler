@@ -22,7 +22,7 @@ test('loads from a plain script tag with no console errors', async ({ page }) =>
   await expect(page.getByRole('heading', { name: 'Image Upscaler' })).toBeVisible();
   // Capabilities are probed on load, so this proves the bundle evaluated.
   await expect(page.locator('#capabilities')).not.toHaveText(/Detecting/);
-  await expect(page.locator('#version')).toContainText('@smartapp/image-upscaler v');
+  await expect(page.locator('#version')).toContainText('@mdabrarsami/image-upscaler v');
   // The model list is rendered from the real catalogue.
   await expect(page.locator('#models li')).toHaveCount(2);
 

@@ -1,4 +1,4 @@
-# @smartapp/image-upscaler
+# @mdabrarsami/image-upscaler
 
 Client-side image upscaling for the browser. Classical reconstruction always
 available; optional local AI super-resolution loaded on demand.
@@ -8,11 +8,11 @@ network request the library can make is downloading an AI model, and only when
 you ask for one.
 
 ```bash
-npm install @smartapp/image-upscaler
+npm install @mdabrarsami/image-upscaler
 ```
 
 ```ts
-import { ImageUpscaler } from '@smartapp/image-upscaler';
+import { ImageUpscaler } from '@mdabrarsami/image-upscaler';
 
 const upscaler = new ImageUpscaler();
 const result = await upscaler.upscale(file, { scale: 4 });
@@ -48,7 +48,7 @@ On the benchmark suite the classical resampler plus anti-ringing scores
 ## Script tag
 
 ```html
-<script src="https://unpkg.com/@smartapp/image-upscaler/dist/image-upscaler.min.js"></script>
+<script src="https://unpkg.com/@mdabrarsami/image-upscaler/dist/image-upscaler.min.js"></script>
 <script>
   const upscaler = new ImageUpscaler();
   const result = await upscaler.upscale(file, { scale: 4 });
@@ -61,13 +61,13 @@ The global is the class itself; the rest of the API hangs off it as statics.
 
 Full documentation lives in the repository:
 
-- [README](https://github.com/smartapp/image-upscaler#readme) — usage for React, Vue, Angular, Workers and Electron
-- [API](https://github.com/smartapp/image-upscaler/blob/main/docs/API.md)
-- [Algorithms](https://github.com/smartapp/image-upscaler/blob/main/docs/ALGORITHMS.md)
-- [AI](https://github.com/smartapp/image-upscaler/blob/main/docs/AI.md) and [Models](https://github.com/smartapp/image-upscaler/blob/main/docs/MODELS.md)
-- [Performance](https://github.com/smartapp/image-upscaler/blob/main/docs/PERFORMANCE.md)
-- [Privacy](https://github.com/smartapp/image-upscaler/blob/main/docs/PRIVACY.md)
-- [Browser support](https://github.com/smartapp/image-upscaler/blob/main/docs/BROWSER_SUPPORT.md)
+- [README](https://github.com/mdabrarsami/image-upscaler#readme) — usage for React, Vue, Angular, Workers and Electron
+- [API](https://github.com/mdabrarsami/image-upscaler/blob/main/docs/API.md)
+- [Algorithms](https://github.com/mdabrarsami/image-upscaler/blob/main/docs/ALGORITHMS.md)
+- [AI](https://github.com/mdabrarsami/image-upscaler/blob/main/docs/AI.md) and [Models](https://github.com/mdabrarsami/image-upscaler/blob/main/docs/MODELS.md)
+- [Performance](https://github.com/mdabrarsami/image-upscaler/blob/main/docs/PERFORMANCE.md)
+- [Privacy](https://github.com/mdabrarsami/image-upscaler/blob/main/docs/PRIVACY.md)
+- [Browser support](https://github.com/mdabrarsami/image-upscaler/blob/main/docs/BROWSER_SUPPORT.md)
 
 ## Licence
 

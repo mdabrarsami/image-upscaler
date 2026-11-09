@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@smartapp/image-upscaler": "*",
-    "@smartapp/image-upscaler-react": "*",
+    "@mdabrarsami/image-upscaler": "*",
+    "@mdabrarsami/image-upscaler-react": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

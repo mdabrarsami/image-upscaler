@@ -9,7 +9,7 @@ import {
   type UpscaleOptions,
   type UpscaleProgress,
   type UpscaleResult,
-} from '@smartapp/image-upscaler';
+} from '@mdabrarsami/image-upscaler';
 
 export type { ImageUpscalerConfig, UpscaleOptions, UpscaleProgress, UpscaleResult };
 

@@ -24,6 +24,6 @@ First release.
 
 - ESM, CJS, IIFE and a prebuilt ESM bundle; TypeScript declarations; source
   maps.
-- `@smartapp/image-upscaler-react` with `useImageUpscaler` and `useModels`.
+- `@mdabrarsami/image-upscaler-react` with `useImageUpscaler` and `useModels`.
 - Zero runtime dependencies; the AI runtime is an optional peer behind a
   dynamic import.

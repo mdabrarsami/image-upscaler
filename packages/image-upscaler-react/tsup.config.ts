@@ -11,5 +11,5 @@ export default defineConfig({
   treeshake: true,
   // Both are peers. Inlining React would break its single-instance rule, and
   // inlining the core would duplicate every cache the upscaler exists to hold.
-  external: ['react', '@smartapp/image-upscaler'],
+  external: ['react', '@mdabrarsami/image-upscaler'],
 });

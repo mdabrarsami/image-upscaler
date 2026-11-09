@@ -18,7 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "build": "npm run build --workspace @smartapp/image-upscaler && npm run build --workspace @smartapp/image-upscaler-react",
+    "build": "npm run build --workspace @mdabrarsami/image-upscaler && npm run build --workspace @mdabrarsami/image-upscaler-react",
     "build:demo": "npm run build --workspace image-upscaler-react-example",
     "benchmark": "node benchmarks/run.mjs",
     "benchmark:ai": "node benchmarks/run.mjs --ai",

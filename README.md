@@ -1,4 +1,4 @@
-# @smartapp/image-upscaler
+# @mdabrarsami/image-upscaler
 
 Client-side image upscaling for the browser. Classical reconstruction always
 available; optional local AI super-resolution loaded on demand.
@@ -9,7 +9,7 @@ only when you ask it to — [verified by a test that watches every request the
 page makes](docs/PRIVACY.md).
 
 ```ts
-import { ImageUpscaler } from '@smartapp/image-upscaler';
+import { ImageUpscaler } from '@mdabrarsami/image-upscaler';
 
 const upscaler = new ImageUpscaler();
 const result = await upscaler.upscale(file, { scale: 4 });
@@ -32,7 +32,7 @@ document.querySelector('img').src = result.toObjectURL();
 ## Install
 
 ```bash
-npm install @smartapp/image-upscaler
+npm install @mdabrarsami/image-upscaler
 ```
 
 The AI runtime is an optional peer. Install it only if you want the AI engine:
@@ -46,7 +46,7 @@ npm install onnxruntime-web
 ### ES modules
 
 ```ts
-import { ImageUpscaler } from '@smartapp/image-upscaler';
+import { ImageUpscaler } from '@mdabrarsami/image-upscaler';
 
 const upscaler = new ImageUpscaler();
 const result = await upscaler.upscale(file, { scale: 4, engine: 'auto' });
@@ -64,13 +64,13 @@ sessions, all of which cost real time to build.
 No bundler, no npm, no build step. The bundle installs one global:
 
 ```html
-<script src="https://unpkg.com/@smartapp/image-upscaler/dist/image-upscaler.min.js"></script>
+<script src="https://unpkg.com/@mdabrarsami/image-upscaler/dist/image-upscaler.min.js"></script>
 <script>
   const upscaler = new ImageUpscaler({
     // A classic script has no `import.meta.url`, so the worker cannot be
     // located automatically. Without this the library still works, on the
     // calling thread.
-    workerUrl: 'https://unpkg.com/@smartapp/image-upscaler/dist/worker.js',
+    workerUrl: 'https://unpkg.com/@mdabrarsami/image-upscaler/dist/worker.js',
   });
 
   document.querySelector('#file').addEventListener('change', async (event) => {
@@ -91,7 +91,7 @@ so on).
 ### React
 
 ```tsx
-import { useImageUpscaler } from '@smartapp/image-upscaler-react';
+import { useImageUpscaler } from '@mdabrarsami/image-upscaler-react';
 
 function Upscale() {
   const { upscale, busy, progress, resultUrl, error, cancel } = useImageUpscaler();
@@ -123,7 +123,7 @@ will — see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ```vue
 <script setup>
 import { ref } from 'vue';
-import { ImageUpscaler } from '@smartapp/image-upscaler';
+import { ImageUpscaler } from '@mdabrarsami/image-upscaler';
 
 const upscaler = new ImageUpscaler();
 const src = ref(null);
@@ -144,7 +144,7 @@ async function onPick(event) {
 
 ```ts
 import { Component } from '@angular/core';
-import { ImageUpscaler } from '@smartapp/image-upscaler';
+import { ImageUpscaler } from '@mdabrarsami/image-upscaler';
 
 @Component({
   selector: 'app-upscale',

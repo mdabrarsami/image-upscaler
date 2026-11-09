@@ -1,7 +1,7 @@
 {
-  "name": "@smartapp/image-upscaler-react",
+  "name": "@mdabrarsami/image-upscaler-react",
   "version": "0.1.0",
-  "description": "React bindings for @smartapp/image-upscaler. A thin hook over the framework-agnostic core.",
+  "description": "React bindings for @mdabrarsami/image-upscaler. A thin hook over the framework-agnostic core.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -22,7 +22,7 @@
     "build": "tsup"
   },
   "peerDependencies": {
-    "@smartapp/image-upscaler": "^0.1.0",
+    "@mdabrarsami/image-upscaler": "^0.1.0",
     "react": ">=18"
   },
   "devDependencies": {

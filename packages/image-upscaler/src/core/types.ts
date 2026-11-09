@@ -1,5 +1,5 @@
 /**
- * Public type surface for @smartapp/image-upscaler.
+ * Public type surface for @mdabrarsami/image-upscaler.
  *
  * Everything exported from here is part of the stable API. Internal helper
  * types live next to their implementation instead.

@@ -8,8 +8,8 @@ Two entry points:
 
 | Specifier | Contents |
 |---|---|
-| `@smartapp/image-upscaler` | Everything below |
-| `@smartapp/image-upscaler/ai` | The AI surface on its own, for bundlers that want it in a separate chunk |
+| `@mdabrarsami/image-upscaler` | Everything below |
+| `@mdabrarsami/image-upscaler/ai` | The AI surface on its own, for bundlers that want it in a separate chunk |
 
 ---
 
@@ -374,7 +374,7 @@ writing wrong pixels.
 attached and how you would attach your own:
 
 ```ts
-import { ClassicalUpscaler, GPUResampler } from '@smartapp/image-upscaler';
+import { ClassicalUpscaler, GPUResampler } from '@mdabrarsami/image-upscaler';
 
 const engine = new ClassicalUpscaler({
   resampler: await GPUResampler.create(),

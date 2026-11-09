@@ -53,7 +53,7 @@
   let beforeUrl = null;
   let afterUrl = null;
 
-  els.version.textContent = `@smartapp/image-upscaler v${ImageUpscaler.VERSION}`;
+  els.version.textContent = `@mdabrarsami/image-upscaler v${ImageUpscaler.VERSION}`;
 
   function makeUpscaler() {
     if (upscaler) void upscaler.dispose();

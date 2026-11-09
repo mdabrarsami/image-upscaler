@@ -1,16 +1,16 @@
-# @smartapp/image-upscaler-react
+# @mdabrarsami/image-upscaler-react
 
-React bindings for [`@smartapp/image-upscaler`](https://www.npmjs.com/package/@smartapp/image-upscaler).
+React bindings for [`@mdabrarsami/image-upscaler`](https://www.npmjs.com/package/@mdabrarsami/image-upscaler).
 
 A thin hook over the framework-agnostic core. The core has no React dependency;
 this package exists only to own the four things React makes awkward.
 
 ```bash
-npm install @smartapp/image-upscaler @smartapp/image-upscaler-react
+npm install @mdabrarsami/image-upscaler @mdabrarsami/image-upscaler-react
 ```
 
 ```tsx
-import { useImageUpscaler } from '@smartapp/image-upscaler-react';
+import { useImageUpscaler } from '@mdabrarsami/image-upscaler-react';
 
 function Upscale() {
   const { upscale, busy, progress, resultUrl, error, cancel } = useImageUpscaler();

@@ -1,5 +1,5 @@
 /**
- * `@smartapp/image-upscaler/ai`
+ * `@mdabrarsami/image-upscaler/ai`
  *
  * The AI-only surface. Split out so a bundler can keep every reference to
  * ONNX Runtime out of an application that never asks for it - importing the

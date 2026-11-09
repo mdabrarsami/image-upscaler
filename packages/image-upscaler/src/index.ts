@@ -1,5 +1,5 @@
 /**
- * @smartapp/image-upscaler
+ * @mdabrarsami/image-upscaler
  *
  * Client-side image upscaling. Classical (Lanczos, edge-directed refinement,
  * detail reconstruction) always available; optional local AI super-resolution

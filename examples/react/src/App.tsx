@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Capabilities, EngineSelection, ScaleFactor, UpscaleMode } from '@smartapp/image-upscaler';
-import { detectCapabilities } from '@smartapp/image-upscaler';
-import { useImageUpscaler, useModels } from '@smartapp/image-upscaler-react';
+import type { Capabilities, EngineSelection, ScaleFactor, UpscaleMode } from '@mdabrarsami/image-upscaler';
+import { detectCapabilities } from '@mdabrarsami/image-upscaler';
+import { useImageUpscaler, useModels } from '@mdabrarsami/image-upscaler-react';
 
 /**
  * React example.
